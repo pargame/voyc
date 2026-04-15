@@ -1,0 +1,14 @@
+space AAA{
+    var{
+        i[int]:1;
+    }
+    
+    fn1{
+        ret:i;
+        i:i+1;
+    }
+}
+
+AAA.i->out;
+
+[p]fn1->out[i<=10];

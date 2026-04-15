@@ -1,0 +1,31 @@
+# Build output
+/build/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+build.ninja
+compile_commands.json
+
+# VS Code workspace settings
+.vscode/
+
+# macOS
+.DS_Store
+
+# Logs and temporary files
+*.log
+*.tmp
+*~
+
+# CMake user files
+CMakeUserPresets.json
+CMakePresets.json
+
+# Generated binary
+/voyc
+
+main
+*.dSYM
