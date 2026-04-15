@@ -75,13 +75,17 @@ VS Code를 이미 열어둔 경우에는:
 ```bash
 cmake -S . -B build -G Ninja
 ```
-* 소스 루트(`.`)를 읽어서 빌드 폴더(`build`)를 만듭니다.
+* `-S .`: 소스 루트 디렉터리를 지정합니다. 현재 폴더(`.`)의 `CMakeLists.txt`를 읽습니다.
+* `-B build`: out-of-source 빌드 디렉터리를 지정합니다. 빌드 결과와 캐시가 `build/` 안에 생성됩니다.
+* `-G Ninja`: Ninja 빌드 시스템을 생성기로 선택합니다.
+* 이 명령은 CMake 구성 파일을 읽고 `build/` 폴더에 빌드 환경을 생성합니다.
 * `build/compile_commands.json`이 생성되어 `clangd`가 올바른 옵션을 읽을 수 있게 됩니다.
 
 ### 3.2. 소스 코드만 수정했을 때
 ```bash
 cmake --build build
 ```
+* `--build build`: 이미 생성된 `build/` 디렉터리에서 빌드를 수행합니다.
 * `build` 폴더의 CMake 설정을 그대로 재사용해서 실행합니다.
 * 변경된 파일만 다시 컴파일합니다.
 
