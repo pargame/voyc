@@ -1,146 +1,290 @@
-# 🛠️ Build Toolchain — C++ 빌드 도구, 컴파일러 그리고 링커 이야기
+# 🛠️ Build Toolchain — C++ 빌드 도구 실전 정리
 
-C++ 프로젝트를 시작하면 가장 먼저 마주치게 되는 다양한 빌드 도구들의 역할을 알아볼게요. 😊 
-복잡해 보이지만, **"제품을 설계하고 조립하는 공장"**에 비유하면 아주 쉽게 이해할 수 있답니다! 🌱
+이 노트는 macOS(맥북) 표준 개발 환경에서 실제로 쓰는 C++ 빌드 흐름과 VS Code 설정을 간결하게 정리합니다.
 
----
+*툴체인(toolchain)*은 소스 코드를 실행 가능한 프로그램으로 만들기 위해 함께 쓰이는 도구들의 모음입니다. 여기서는 CMake, Ninja, clang++, 링커 같이 빌드와 컴파일, 링킹을 담당하는 도구들의 연계를 의미합니다.
 
-## 1. 🏗️ 빌드 도구 (Build Tools)
-**🧭 비유: 공장의 총괄 설계자와 작업 반장**
-
-소스 파일이 많아지면 사람이 일일이 명령어를 입력해서 프로그램을 완성하기 어려워져요. 그래서 이 전체 과정을 자동화하고 관리해 주는 도구가 필요합니다.
-
-* **CMake (총괄 설계자):**
-  * "이 부품(소스 코드)들을 모아서 이런 제품(실행 파일)을 만들 거야!" 하고 전체적인 **설계도(빌드 스크립트)를 생성**하는 역할을 해요.
-  * 스스로 코드 번역을 하지는 않고, 환경에 맞춰 `Makefile`이나 `Ninja 스크립트`를 만들어 줍니다. 📝
-* **Ninja 또는 Make (작업 반장):**
-  * CMake가 만들어준 설계도를 들고, 실제 노동자(컴파일러)들에게 "너는 먼저 이 부품을 깎아!"라고 **구체적인 작업 지시를 내리는 실행기**입니다.
-  * 특히 **Ninja**는 작업 흐름이 꼬이지 않게 병렬로 일을 시키는 데 특화되어 있어서 속도가 매우 빠르답니다! ⚡️
-
-## 2. 🪚 컴파일러 (Compiler)
-**🧭 비유: 부품을 깎고 다듬는 기술자**
-
-* **역할:** 사람이 읽을 수 있는 C++ 소스 코드(`.cpp`)를 컴퓨터가 이해할 수 있는 기계어 덩어리인 **오브젝트 파일(`.o` 또는 `.obj`)로 변환**합니다.
-* **주요 동작:**
-  * `#include`로 가져온 헤더 파일 내용이나 매크로를 먼저 코드에 풀어넣어요 (전처리 과정).
-  * 문법이 맞는지, 타입은 올바른지 엄격하게 검사한 뒤, 기계어로 번역해 줍니다.
-* **macOS 환경의 대표 주자:**
-  * `clang++`: Apple 환경에서 기본적으로 사용되는 아주 똑똑한 C++ 컴파일러예요. 홈브루(Homebrew)를 통해 최신 버전을 설치해서 쓰기도 합니다. 🍎
-
-## 3. 🔗 링커 (Linker)
-**🧭 비유: 깎아놓은 부품들을 모아 완성품으로 조립하는 조립 전문가**
-
-* **역할:** 컴파일러가 만들어둔 여러 개의 오브젝트 파일(부품)들과 외부 라이브러리들을 하나로 **연결(Link)해서 최종 실행 파일이나 라이브러리로 결합**합니다.
-* **주요 동작:**
-  * 특정 소스 파일에서 "이 함수는 다른 파일에 있어!" 하고 남겨둔 빈칸(심볼 참조)들을 찾아서, 실제 해당 함수가 있는 주소와 딱 맞게 연결해 줘요. 🧩
-* **macOS 환경의 대표 주자:**
-  * `ld` 또는 LLVM의 `lld`가 주로 쓰여요. 보통은 우리가 직접 부르지 않아도 컴파일러(`clang++`)가 마지막 단계에서 자동으로 링커를 불러와서 작업을 마무리한답니다.
+> 이 프로젝트는 macOS용입니다. `clang++`, `Ninja`, `CMake`는 macOS 환경에서 Homebrew로 설치하는 경우를 기준으로 설명하며, 표준적 맥북 C++ 개발 환경에 어울리는 구성입니다.
 
 ---
 
-## 4. 🔄 전체 빌드 흐름
-빌드에서 중요한 것은 "무엇이 먼저"가 아니라 "어떤 역할을 누가 담당하는가"입니다.
+## 1. macOS 전용 설치 및 환경 변수
 
-* **CMake**는 전체 설계를 만드는 설계자입니다. 어떤 소스 파일을 컴파일할지, 어떤 옵션을 넘길지, 어떤 include 경로가 필요한지를 정리해 줍니다.
-* **Ninja/Make**는 설계도를 실제 작업 순서로 바꾸는 실행기입니다. 어떤 파일을 먼저 컴파일할지, 어떤 파일이 변경되었는지를 판단해서 필요한 작업만 실행합니다.
-* <strong>clang++</strong>는 각 소스 파일을 하나씩 오브젝트 파일로 번역하는 기술자입니다. 이때 이미 빌드 도구가 정한 의존성과 옵션을 사용합니다.
-* **ld/lld**는 모든 오브젝트 파일을 모아 최종 실행 파일로 조립하는 조립 전문가입니다.
+### 1.1. 필요한 도구 설치
+```bash
+brew install cmake ninja llvm
+```
+* `cmake`: 빌드 설정 생성 도구
+* `ninja`: 빠른 빌드 실행기
+* `llvm`: Homebrew LLVM 툴체인. macOS 시스템 기본 `clang` 대신 Homebrew LLVM을 쓰는 이유는 다음과 같습니다.
+  * `clang`, `clang++`: C/C++ 컴파일러. 프로젝트와 `clangd`가 동일한 컴파일러를 쓰도록 맞춥니다.
+  * `clangd`: C/C++ 언어 서버. VS Code에서 빌드 기반 자동 완성, 정의로 이동, 오류 진단을 정확하게 제공합니다.
+  * `lldb`, `lldb-server`: 디버거. macOS에서 `CodeLLDB`와 함께 네이티브 디버깅을 지원합니다.
+  * `llvm-ar`, `llvm-ranlib`: 정적 라이브러리(`.a`)를 만들 때 사용합니다.
+  * `llvm-config`: LLVM 라이브러리/헤더 경로를 확인할 때 유용합니다.
 
-이런 이유로, **의존성을 계산하는 주체는 빌드 도구**이고, **컴파일러는 그 결과에 따라 번역 작업을 수행**합니다. 즉, CMake나 Ninja가 전체 빌드 계획을 먼저 세운 뒤에야 `clang++`가 각 `.cpp` 파일을 컴파일할 수 있습니다.
+이 프로젝트는 CMake + Ninja 기반 빌드 환경이므로, `llvm` 패키지를 설치하면 `clang++` 컴파일러와 `clangd` 언어 서버가 같은 Homebrew 경로에 존재해 빌드/편집 환경이 일관됩니다.
 
-### 간단한 흐름
-1. `CMakeLists.txt`를 읽고 CMake가 빌드 설계를 만듭니다.
-2. `Ninja`가 이 설계에서 실제 작업 순서와 의존성을 계산합니다.
-3. `clang++`가 각 `.cpp` 파일을 오브젝트 파일로 컴파일합니다.
-4. `ld/lld`가 오브젝트 파일을 연결해 실행 파일을 만듭니다.
+### 1.2. 환경 변수 설정 이유
+Homebrew로 설치한 `llvm`과 `ninja`를 바로 쓰려면, 쉘이 해당 바이너리 경로를 찾아야 합니다.
 
-### 자주 헷갈리는 점
-* `src/*` 같은 와일드카드를 `add_executable()`에 넣으면 CMake가 파일 변경을 제대로 추적하지 못할 수 있습니다. 프로젝트에 새 파일을 추가하거나 삭제할 때 빌드 시스템이 이전 캐시를 재사용해 잘못된 결과를 낼 수 있기 때문에, 소스 파일은 개별적으로 명시하는 것이 안전합니다.
-* 새 `.cpp` 파일을 추가한 경우에는 `cmake -S . -B build -G Ninja`를 다시 실행해 빌드 시스템을 갱신해야 합니다. 기존 파일만 수정했다면 `cmake --build build`만으로 충분합니다.
+`~/.zshrc` 또는 `~/.zprofile`에 다음을 추가하세요:
+```bash
+export PATH="/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/ninja/bin:$PATH"
+export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
+export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
+export PKG_CONFIG_PATH="/opt/homebrew/opt/llvm/lib/pkgconfig:$PKG_CONFIG_PATH"
+```
 
-## 5. ▶️ 실제 CMake 실행 흐름
-1. 처음 한 번, 빌드 메타데이터를 생성합니다.
-   ```bash
-   cmake -S . -B build -G Ninja
-   ```
-   * `-S .` 는 소스 루트
-   * `-B build` 는 빌드 결과와 설정을 저장할 디렉터리
-   * `-G Ninja`는 Ninja 빌드 시스템을 사용하겠다는 뜻입니다
-2. 이 단계에서 `build/compile_commands.json`이 생성됩니다. 이 파일을 `clangd`가 읽습니다.
-3. 실제 컴파일은 다음 명령으로 수행합니다.
-   ```bash
-   cmake --build build
-   ```
-4. 새 `.cpp` 파일을 추가한 경우에는 `cmake -S . -B build -G Ninja`를 다시 실행해야 합니다.
-5. 기존 파일만 수정했다면 `cmake --build build`만으로 충분합니다.
+### 1.3. 환경 변수 반영 방법
+설정을 바꾼 뒤에는 다음 중 하나를 실행해야 새 터미널에 반영됩니다:
+```bash
+source ~/.zshrc
+```
+또는
+```bash
+source ~/.zprofile
+```
 
-## 5-1. 🔧 실제로 언제 어떤 명령어를 쓰나
-* 처음 한 번만 CMake를 설정할 때:
-  ```bash
-  cmake -S . -B build -G Ninja
-  ```
-* 소스 코드만 수정했을 때 다시 빌드할 때:
-  ```bash
-  cmake --build build
-  ```
-* `CMakeLists.txt`를 바꾸거나 `.cpp` 파일을 새로 추가/삭제했을 때:
-  ```bash
-  cmake -S . -B build -G Ninja
-  cmake --build build
-  ```
-* 실행할 때:
-  ```bash
-  ./build/voyc example.voy
-  ```
+VS Code를 이미 열어둔 경우에는:
+* 통합 터미널을 닫았다가 새로 열기
+* 또는 VS Code 자체를 재시작
 
-## 6. 📝 CMakeLists.txt 작성 가이드
-CMake 총괄 설계자에게 지시를 내리기 위해 우리가 작성해야 하는 명세서가 바로 `CMakeLists.txt` 파일이에요. 모던 C++(Modern C++)의 정석적인 작성법을 소개합니다! ✨
+이렇게 해야 VS Code가 새 `PATH`를 인식해서 `clang++`, `ninja`, `cmake`를 올바르게 사용할 수 있습니다.
 
-### 기본 뼈대와 예시
+---
+
+## 2. CMake / Ninja / clang++ 역할 요약
+
+* **CMake**: 프로젝트 설정을 읽고 빌드 시스템(Ninja) 구성을 생성합니다.
+* **Ninja**: 빌드 순서와 의존성을 계산하고 필요한 컴파일/링크 작업만 실행합니다.
+* **clang++**: 각 `.cpp`를 컴파일해서 오브젝트 파일로 만듭니다.
+* **ld/lld**: 오브젝트 파일을 합쳐 최종 실행 파일을 만듭니다.
+
+### 핵심 정리
+* CMake는 빌드 설정을 생성합니다.
+* Ninja는 작업 실행 계획을 만듭니다.
+* clang++는 실제로 코드를 번역합니다.
+* 링커는 결과물들을 합칩니다.
+
+---
+
+## 3. 언제 어떤 명령어를 쓰나
+
+### 3.1. 처음 한 번만 실행
+```bash
+cmake -S . -B build -G Ninja
+```
+* 소스 루트(`.`)를 읽어서 빌드 폴더(`build`)를 만듭니다.
+* `build/compile_commands.json`이 생성되어 `clangd`가 올바른 옵션을 읽을 수 있게 됩니다.
+
+### 3.2. 소스 코드만 수정했을 때
+```bash
+cmake --build build
+```
+* `build` 폴더의 CMake 설정을 그대로 재사용해서 실행합니다.
+* 변경된 파일만 다시 컴파일합니다.
+
+### 3.3. CMakeLists.txt나 소스 파일 추가/삭제 시
+```bash
+cmake -S . -B build -G Ninja
+cmake --build build
+```
+* 빌드 구성이 바뀌었으므로 CMake 재실행 후 빌드해야 합니다.
+
+### 3.4. 빌드 결과 실행
+```bash
+./build/voyc example.voy
+```
+* `./build/voyc`는 CMake에서 `add_executable(voyc ...)`로 생성한 실행 파일입니다.
+* `build/` 폴더는 CMake가 빌드 메타데이터와 바이너리를 저장하는 위치이므로, 실행할 때는 `./build/voyc`를 사용합니다.
+* `example.voy`는 입력 파일로, 프로그램에 사용될 스크립트/데이터 파일입니다.
+
+---
+
+## 4. CMakeLists.txt 실제 구성
+
+이 프로젝트에서 쓰는 표준 CMake 설정입니다. 실제로는 `CMakeLists.txt`가 어떤 역할을 하는지, 왜 빌드 폴더를 따로 쓰는지, `clangd`와 어떤 관계인지 이해하는 것이 중요합니다.
+
 ```cmake
-# 1. 사용할 CMake의 최소 버전을 명시해요. (새로운 기능을 쓰려면 버전을 높여야 합니다)
 cmake_minimum_required(VERSION 3.24)
-
-# 2. 프로젝트의 이름과 버전을 정하고, C++ 언어(CXX)를 사용한다고 선언해요.
 project(voyc VERSION 0.1 LANGUAGES CXX)
 
-# 3. 사용할 C++ 표준(예: C++26)을 지정하고 필수로 강제합니다.
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF) # 컴파일러만의 독자 규격은 끄고 표준만 따르도록 설정해요.
-
-# 4. 자동 완성(IntelliSense)을 돕기 위해 clangd가 읽을 메타 데이터를 뽑아내도록 켭니다.
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-#    이 옵션을 켜면 빌드 디렉터리에 compile_commands.json 파일이 생성되어, 언어 서버가 정확한 컴파일 옵션과 include 경로를 알 수 있게 됩니다.
 
-# 5. 제품(최종 실행 파일)의 이름과, 제품을 만들 때 들어갈 부품(소스 코드)들을 나열해요.
 add_executable(voyc
     src/main.cpp
     src/lexer.cpp
 )
 
-# 6. 헤더 파일들을 어디서 찾을지(Include 경로) 알려줍니다.
 target_include_directories(voyc PRIVATE
     ${CMAKE_SOURCE_DIR}/include
 )
+
+target_compile_options(voyc PRIVATE
+    $<$<CXX_COMPILER_ID:Clang>:-Wall;-Wextra;-Wpedantic>
+)
 ```
 
-### 💡 작성 꿀팁
-* **`target_*` 함수 사용하기:**
-  경로를 지정할 때 과거에는 전체 프로젝트에 영향을 주는 `include_directories()`를 썼지만, 요즘은 위의 예시처럼 `target_include_directories()`를 써서 **특정 타겟(제품)에만 경로를 적용**하는 것이 안전하고 권장되는 방식이에요. (이걸 타겟 중심 접근법이라고 불러요! 🎯)
-* **`compile_commands.json` 생성하기:**
-  `CMAKE_EXPORT_COMPILE_COMMANDS ON`을 설정하면, 설정 과정에서 컴파일 플래그와 경로들이 담긴 작업 일지 역할을 하는 JSON 파일을 빌드 디렉터리에 남겨줘요. VS Code의 언어 서버인 `clangd`가 이 파일을 기준으로 코드 자동 완성을 완벽하게 제공합니다! 🤖
-* **`.clangd` 파일 최소화:**
-  `compile_commands.json`이 생성되는 프로젝트라면 `.clangd`에 `CompileFlags`를 중복해서 적을 필요가 없습니다. `clangd`가 JSON을 우선 읽기 때문에, 중복 설정은 제거하는 것이 좋습니다.
-* **루트 설정 최소화:**
-  이 프로젝트는 `.clangd`를 `configs/.clangd`로 이동했으며, 실제 사용 설정은 `.vscode/settings.json`에서 `clangd.arguments`로 `build` 디렉터리의 `compile_commands.json`을 참조하도록 맞춰 두었습니다.
+### CMake 설정 항목별 설명
+
+#### `cmake_minimum_required(VERSION 3.24)`
+* 프로젝트가 요구하는 최소 CMake 버전을 명시합니다.
+* CMake가 제공하는 문법이나 기능이 변경될 때, 오래된 버전에서 예기치 않은 동작을 방지하는 역할을 합니다.
+
+#### `project(voyc VERSION 0.1 LANGUAGES CXX)`
+* CMake 내부에서 `PROJECT_NAME`, `PROJECT_VERSION` 같은 변수를 설정합니다.
+* `LANGUAGES CXX`는 CMake가 C++ 컴파일러를 찾고 C++ 관련 규칙을 활성화하도록 합니다.
+
+#### `set(CMAKE_CXX_STANDARD 26)`
+* `clang++`에 `-std=c++26` 옵션을 자동으로 추가하도록 합니다.
+* C++26을 명시하면, 최신 언어 기능을 사용하는 코드에서도 일관된 표준을 보장할 수 있습니다.
+
+#### `set(CMAKE_CXX_STANDARD_REQUIRED ON)`
+* 지정한 표준이 필수임을 뜻합니다.
+* C++26을 지원하지 않는 컴파일러에서는 구성 단계에서 즉시 실패하기 때문에, 빌드 전 호환성 문제가 조기에 발견됩니다.
+
+#### `set(CMAKE_CXX_EXTENSIONS OFF)`
+* 기본 GNU 확장을 끄고 표준 C++ 모드를 사용하도록 합니다.
+* 플랫폼에 따라 다르게 동작하는 컴파일러 확장 기능을 배제해 코드 이식성을 높입니다.
+
+#### `set(CMAKE_EXPORT_COMPILE_COMMANDS ON)`
+* `build/compile_commands.json`를 생성해 빌드 명세를 외부 툴에 제공합니다.
+* `clangd`는 이 파일을 통해 실제 컴파일 명령과 include 경로를 읽어 정확한 코드 분석을 수행합니다.
+* 이 파일은 `build/` 폴더에 저장되므로, 소스 트리와 분리된 out-of-source 빌드의 장점을 살릴 수 있습니다.
+
+#### `add_executable(voyc src/main.cpp src/lexer.cpp)`
+* `voyc` 실행 파일을 만들고 빌드 대상 소스 파일을 명시합니다.
+* 파일을 명시적으로 나열하는 방식은 빌드 결과를 예측 가능하게 합니다. `file(GLOB ...)`처럼 흐름을 숨기는 방식은 권장되지 않습니다.
+
+#### `target_include_directories(voyc PRIVATE ${CMAKE_SOURCE_DIR}/include)`
+* `include/` 폴더를 해당 타겟의 헤더 검색 경로에 추가합니다.
+* `PRIVATE`은 이 경로가 이 타겟 내부에서만 적용된다는 의미입니다.
+* 다른 타겟으로 헤더 검색 경로가 전파되지 않아, 의존성 그래프가 더 명확해집니다.
+
+#### `target_compile_options(voyc PRIVATE $<$<CXX_COMPILER_ID:Clang>:-Wall;-Wextra;-Wpedantic>)`
+* Clang 전용 경고 플래그를 설정합니다.
+* `generator expression`으로 Clang일 때만 옵션을 넣어 다른 컴파일러와 충돌하지 않게 합니다.
+* `-Wall -Wextra -Wpedantic`는 코드 문제를 초기에 발견하는 데 유용한 기본 경고 세트입니다.
+
+### 핵심 팁
+* `CMakeLists.txt`를 수정했다면, 기존 `build/` 구성과 동기화하려면 `cmake -S . -B build -G Ninja`를 다시 실행하세요.
+* 이 단계는 CMake가 실제 컴파일러 명령어를 다시 생성하도록 합니다.
+* 이후 `cmake --build build`로 빌드를 실행하면 수정된 설정이 반영됩니다.
+
+### `.clangd` vs `compile_commands.json`
+* `compile_commands.json`은 CMake가 만든 빌드 명세입니다. 각 소스 파일을 어떤 컴파일러, 어떤 옵션, 어떤 include 경로로 컴파일할지를 정확히 기록합니다.
+* `clangd`는 이 파일을 읽어서 VS Code의 자동 완성과 경고를 실제 빌드 환경과 일치하게 만듭니다.
+* `.clangd`는 `clangd` 자체의 설정 파일입니다. 프로젝트별 동작 방식을 조정하거나, `compile_commands.json`이 없는 경우에 폴백 설정을 제공할 때 사용합니다.
+* 이 프로젝트처럼 CMake가 `compile_commands.json`을 생성하는 환경에서는, 표준적인 워크플로우로 `.clangd`에 컴파일 플래그를 다시 쓰지 않아도 됩니다. `clangd`는 `compile_commands.json`을 우선 참조합니다.
+* `.clangd`는 기본적으로 프로젝트 루트에서 자동 탐지됩니다. 루트가 아닌 다른 폴더(`configs/.clangd` 등)에 두면, VS Code에서 별도 `clangd.arguments` 설정이나 `--enable-config` 설정이 필요합니다.
+* 현재 이 프로젝트는 `.clangd`를 `configs/.clangd`로 옮긴 상태이지만, 실제로는 `build/compile_commands.json` 정보가 우선 사용됩니다. 표준 macOS CMake 개발 환경에서는 루트 `.clangd`나 `compile_commands.json`만으로 충분합니다.
 
 ---
 
-## 7. 🍎 macOS + VS Code C++ 개발 필수 확장
-macOS 환경에서 다중 파일 C++ 개발을 할 때 일반적으로 함께 쓰는 확장 조합입니다.
+## 5. VS Code에서 CMake Tools 버튼 사용하기
 
-1. **clangd**: 문법 검사, 코드 자동 완성, 에러 진단을 제공하는 핵심 언어 서버입니다.
-2. **CodeLLDB**: macOS와 잘 어울리는 디버거로, 중단점(Breakpoint) 설정과 단계별 실행, 메모리 확인을 도와줍니다.
-3. **CMake Tools**: VS Code 상태 표시줄에 구성(Configure), 빌드(Build), 실행(Run) 버튼을 추가해 주기 때문에, 터미널 명령어 입력 없이도 빌드를 관리하기 쉽게 해줍니다.
+### 5.1. 버튼이 보이려면
+* `CMake Tools` 확장을 설치해야 합니다.
+* 설치 후 상태바에서 `Configure` / `Build` / `Run` 버튼이 표시됩니다.
+* 설치 명령어 예시:
+  ```bash
+  code --install-extension ms-vscode.cmake-tools
+  ```
+
+### 5.2. 버튼이 없을 때
+* 확장을 사용하지 않으면 상태바 버튼 없이도 터미널 명령으로 동일한 작업이 가능합니다.
+* `CMake Tools`가 설치되어 있어도 CMake가 아직 구성되지 않았으면, VS Code는 CMake 빌드 버튼 대신 `Compile Active File` 같은 단일 파일 컴파일 UI를 보여줄 수 있습니다.
+  * 이 경우는 VS Code가 전체 CMake 프로젝트를 인식하지 못한 상태입니다.
+  * 먼저 `CMake: Configure`를 실행해 `build` 폴더와 `compile_commands.json`이 생성되는지 확인해야 합니다.
+
+### 5.3. VS Code CMake 실행 순서
+1. `CMake: Select a Kit` 실행
+2. macOS용 `darwin` kit 선택
+3. `CMake: Configure` 실행
+4. `CMake: Build` 실행
+
+### 5.4. darwin vs msvc kit 차이
+* `darwin` kit은 macOS용 빌드 환경을 뜻합니다.
+* `msvc` kit은 Windows용 Microsoft Visual C++ 빌드 환경을 뜻합니다.
+* macOS에서는 `darwin`을 선택해야 합니다. `msvc`는 macOS에서 사용할 수 없습니다.
+* `darwin`이 여러 개 보일 때는 흔히 다음 두 종류 중 하나입니다:
+  * 시스템 기본 Apple clang (`/usr/bin/clang++`)
+  * Homebrew LLVM clang (`/opt/homebrew/opt/llvm/bin/clang++`)
+* `darwin`을 선택하면 macOS 플랫폼과 clang 계열 컴파일러가 연결된 상태가 됩니다.
+
+### 5.5. VS Code 확장 조합 차이
+* `clangd` 확장은 `clangd` 언어 서버를 사용합니다. CMake의 `compile_commands.json`을 읽어 실제 빌드 옵션을 그대로 반영하므로, CMake 프로젝트에서 정확한 진단과 자동완성을 받기 좋습니다.
+* `C/C++` 확장은 Microsoft가 만든 `cpptools`입니다. 일반적으로는 빠른 IntelliSense, 사전 설정된 include 경로, Windows/MSVC 환경을 잘 지원합니다.
+* `CodeLLDB`는 LLDB 기반 디버거입니다. macOS에서 `clangd`와 함께 쓰기에 적합하며, `CMake Tools`와 함께 디버깅을 원활하게 해 줍니다.
+
+#### 어떤 조합을 쓰면 좋은가
+* macOS + CMake 프로젝트라면 `clangd` + `CodeLLDB` 조합이 가장 자연스럽습니다.
+* `C/C++` 확장을 추가로 설치하면 편리할 수 있지만, `clangd`가 이미 빌드 기반 진단을 담당하고 있으므로 동일한 역할을 중복할 수 있습니다.
+* `C/C++` 확장만으로도 기본 코딩은 가능하지만, CMake와 `compile_commands.json`이 제대로 연결된 `clangd` 환경이 더 정확합니다.
+
+---
+
+## 6. 추가 실전 팁
+
+### 6.1. 새 `.cpp` 파일 추가 시
+* `CMakeLists.txt`에서 새 파일을 등록합니다.
+* 파일 추가 후 반드시 `cmake -S . -B build -G Ninja`를 재실행합니다.
+
+### 6.2. 소스 수정 후
+* `cmake --build build`만 실행하면 됩니다.
+
+### 6.3. `.clangd` 설정
+* `compile_commands.json`을 사용하는 프로젝트라면 `.clangd`에 `CompileFlags`를 중복해서 적지 않아도 됩니다.
+* 이 프로젝트는 `.clangd`를 `configs/.clangd`로 옮겨 두었습니다.
+
+### 6.4. `.gitignore`에 포함해야 할 항목
+* `build/`
+* `.vscode/`
+* `compile_commands.json`
+* `main`
+* `*.dSYM`
+
+---
+
+## 7. 확인해야 할 상황별 요약
+
+| 상황 | 명령어 |
+|---|---|
+| 처음 설정 | `cmake -S . -B build -G Ninja` |
+| 코드만 수정 | `cmake --build build` |
+| 새 파일 추가 | `cmake -S . -B build -G Ninja` + `cmake --build build` |
+| 실행 | `./build/voyc example.voy` |
+| VS Code 버튼 사용 | `CMake Tools` 설치 후 `Configure` → `Build` |
+
+---
+
+## 8. 핵심 정리
+
+* 이 문서는 macOS Homebrew 기반 CMake + Ninja + clang++ 워크플로우를 기준으로 합니다.
+* 프로젝트 빌드는 항상 `cmake -S . -B build -G Ninja`로 구성하고, 이후에는 `cmake --build build`를 쓰세요.
+* 새 소스 파일을 추가하거나 CMakeLists.txt를 수정하면 CMake 구성을 다시 실행해야 합니다.
+* `compile_commands.json`이 있으면 `clangd`가 실제 빌드 옵션을 그대로 사용합니다.
+* `.clangd`는 보조 설정일 뿐이며, 루트에 없으면 추가 탐지 설정이 필요합니다.
+* VS Code에서 `CMake Tools` 버튼을 보려면 확장 설치가 필요하며, 설치 후에도 `Configure`가 먼저 실행되어야 합니다.
+
+## 9. 추가 개선 포인트
+
+### 9.1. Homebrew LLVM과 macOS 기본 clang의 선택 기준
+* Homebrew LLVM은 `clang`, `clang++`, `clangd`, `lldb`가 같은 경로에 있어, 빌드와 에디터 진단 환경을 일관되게 맞출 수 있습니다.
+* macOS 기본 `clang`은 시스템 SDK와 Xcode 버전에 묶여 있어 최신 C++ 표준이나 `clangd` 버전과 불일치가 발생할 수 있습니다.
+* 실무에서는 `clangd`가 사용하는 컴파일러와 실제 빌드 컴파일러를 동일하게 유지하는 것이 중요합니다.
+
+### 9.2. `build/` 디렉터리를 다시 구성해야 할 때
+* CMake 옵션을 변경하거나 `CMakeLists.txt`를 크게 수정한 뒤에도 이상한 캐시 상태가 유지되면, `build/`를 삭제하고 다시 구성하는 것이 안전합니다.
+* 기본 절차:
+  ```bash
+  rm -rf build
+  cmake -S . -B build -G Ninja
+  cmake --build build
+  ```
+* `CMakeCache.txt`가 오래된 구성 정보를 담고 있으면, `compile_commands.json`이나 타깃 링크 설정이 예상과 다른 결과를 줄 수 있습니다.
 
