@@ -15,10 +15,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  std::string src(argv[1]);
-  std::cout<<src;
-
+  std::string src((std::istreambuf_iterator<char>(file))
+  , std::istreambuf_iterator<char>());
+  std::cout << src;
   
-
   return 0;
 }
