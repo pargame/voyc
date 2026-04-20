@@ -1,6 +1,8 @@
-#include "voyc/token.hpp"
-#include <iostream>
+#include "voyc/lexer.hpp"
+
 #include <fstream>
+//#include <functional>
+#include <iostream>
 #include <string>
 
 int main(int argc, char **argv) {
@@ -15,9 +17,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  std::string src((std::istreambuf_iterator<char>(file))
-  , std::istreambuf_iterator<char>());
-  std::cout << src;
-  
+  std::string const src((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+  const voyc::LexResult lexResult = voyc::lexSource(src);
+
   return 0;
 }
