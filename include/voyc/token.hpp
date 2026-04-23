@@ -5,8 +5,20 @@ enum class TokenType {
   EndOfFile,  // EOF
   Unknown,    // 알 수 없는 토큰
   Comment,    // #
-  Identifier, // var names, space names, etc.
-  Number,     // 0~9
+  Identifier, // var names, zone names, etc.
+
+  LitInt,    // 0~9
+  LitFloat,  // n.n
+  LitString, // 'abc 123 #&*/'
+
+  KwRet,      // ret
+  KwRef,      // ref
+  KwInt,      // int
+  KwString,   // string
+  KwFloat,    // float
+  KwZone,     // ZONE{...}
+  KwLocal,    // LOCAL{...}
+  KwOperator, // OP{...}
 
   Plus,     // +
   Minus,    // -
@@ -36,6 +48,6 @@ enum class TokenType {
 struct Token {
   TokenType type;
   std::string_view lexeme;
-  int line;
-  int column;
+  size_t line;
+  size_t column;
 };
