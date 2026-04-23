@@ -2,6 +2,7 @@
 #include "voyc/token.hpp"
 
 #include <cctype>
+#include <string>
 #include <string_view>
 
 namespace voyc {
@@ -123,7 +124,7 @@ private:
       }
 
       TokenType t = TokenType::LitString;
-      std::string_view lex{src_.data() + index_ + 1, i - index_};
+      std::string_view lex{src_.data() + index_ + 1, i - index_ - 1};
 
       if (i == src_.size() || src_[i] == '\n') {
         t = TokenType::Unknown;
@@ -174,9 +175,12 @@ private:
     return src_[i] == ' ' || src_[i] == '\t' || src_[i] == '\r' || src_[i] == '\n';
   }
 
-  void appendError(std::vector<std::string> &errors, Token &next) {
+  void appendError(std::vector<std::string> &errors, const Token &next) {
+    std::string msg = "Unknown token '" + std::string(next.lexeme) + "' at " + std::to_string(next.line) + ":" + std::to_string(next.column);
+    errors.push_back(std::move(msg));
   }
-  void appendToken(std::vector<Token> &tokens, Token &next) {
+  void appendToken(std::vector<Token> &tokens, const Token &next) {
+    tokens.push_back(next);
   }
 
   TokenType tokenTypeFromChar(size_t i) {
