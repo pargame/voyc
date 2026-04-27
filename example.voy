@@ -1,14 +1,10 @@
-space AAA{
-    var{
-        i[int]:1;
-    }
-    
-    fn1{
-        ret:i;
-        i:i+1;
-    }
-}
+avc123
+1234 ab_as
+12.34  123abc  
+12ag.12.3  12.344.6778.2
++ - * / ( ) { } [] ~ = < <=
+dsa#23134eqwq
 
-AAA.i->out;
 
-[p]fn1->out[i<=10];
+'awd'
+'asasfas1231+

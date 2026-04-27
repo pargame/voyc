@@ -2,15 +2,14 @@
 #include <string_view>
 
 enum class TokenType {
-  EndOfFile,  // EOF
-  Unknown,    // 알 수 없는 토큰
-  Comment,    // #
+  Unknown,
+
+  //Number
+  LitInt,   // 0~9
+  LitFloat, // n.n
+
+  //Name
   Identifier, // var names, zone names, etc.
-
-  LitInt,    // 0~9
-  LitFloat,  // n.n
-  LitString, // 'abc 123 #&*/'
-
   KwRet,      // ret
   KwRef,      // ref
   KwInt,      // int
@@ -20,18 +19,19 @@ enum class TokenType {
   KwLocal,    // LOCAL{...}
   KwOperator, // OP{...}
 
-  Plus,     // +
-  Minus,    // -
-  Asterisk, // *
-  Slash,    // /
-
-  Equal,     // =
-  Less,      // <
-  LessEqual, // <=
-  And,       // &
-  Or,        // |
-  Not,       // !
-
+  // Certain
+  Plus,         // +
+  Minus,        // -
+  Asterisk,     // *
+  Slash,        // /
+  Comment,      // #
+  Equal,        // =
+  Less,         // <
+  LessEqual,    // <=
+  And,          // &
+  Or,           // |
+  Not,          // !
+  LitString,    // 'abc 123 #&*/'
   Colon,        // :
   Semicolon,    // ;
   LeftParen,    // (
@@ -40,9 +40,8 @@ enum class TokenType {
   RightBrace,   // }
   LeftBracket,  // [
   RightBracket, // ]
-
-  Period,  // .
-  Execute, // >
+  Tilde,        // ~
+  Execute,      // >
 };
 
 struct Token {

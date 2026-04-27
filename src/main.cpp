@@ -7,8 +7,6 @@
 
 static const char *tokenTypeToString(TokenType type) {
   switch (type) {
-  case TokenType::EndOfFile:
-    return "EndOfFile";
   case TokenType::Unknown:
     return "Unknown";
   case TokenType::Comment:
@@ -73,8 +71,8 @@ static const char *tokenTypeToString(TokenType type) {
     return "LeftBracket";
   case TokenType::RightBracket:
     return "RightBracket";
-  case TokenType::Period:
-    return "Period";
+  case TokenType::Tilde:
+    return "Tilde";
   case TokenType::Execute:
     return "Execute";
   default:

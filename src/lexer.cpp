@@ -2,12 +2,20 @@
 #include "voyc/token.hpp"
 
 #include <cctype>
+#include <cstddef>
 #include <string>
 #include <string_view>
 
 namespace voyc {
 
 namespace {
+
+enum class TokenKind {
+  Unknown,
+  Certain,
+  Number,
+  Name,
+};
 
 class Lexer {
   // 역할: string_view로 된 소스코드를 읽어서 토큰으로 분해하는 역할
@@ -24,230 +32,263 @@ public:
   LexResult run() {
     LexResult result;
 
-    Token next = peekToken();
-
-    while (next.type != TokenType::EndOfFile) {
+    while (index_ < src_.size()) {
+      std::string msg;
+      Token next = nextToken(msg);
       if (next.type == TokenType::Unknown) {
-        appendError(result.errors, next);
+        result.errors.push_back(msg);
       } else {
-        appendToken(result.tokens, next);
+        result.tokens.push_back(next);
       }
-      next = peekToken();
     }
 
     return result;
   }
 
 private:
-  Token peekToken() {
-    if (index_ < src_.size()) {
-      skipTrivia();
-    }
+  Token nextToken(std::string &msg) {
+    skipTrivia();
 
-    TokenType type = tokenTypeFromChar(index_);
+    TokenType type = TokenType::Unknown;
+    size_t len = 0;
+    size_t start_index = index_;
     size_t start_column = column_;
+    TokenKind kind = singleKind();
 
-    switch (type) {
-    case TokenType::EndOfFile: {
-      return Token(type, std::string_view{}, line_, column_);
-    }
-
-    case TokenType::Identifier: { // Kw..
-      size_t i = index_ + 1;
-      ++column_;
-
-      while (i < src_.size() && (std::isalnum(src_[i]) || src_[i] == '_')) {
-        ++i;
-        ++column_;
-      }
-
-      TokenType t = type;
-      std::string_view lex = std::string_view{src_.data() + index_, i - index_};
-      index_ = i;
-
-      {
-        if (lex == "ZONE") {
-          t = TokenType::KwZone;
-        } else if (lex == "LOC") {
-          t = TokenType::KwLocal;
-        } else if (lex == "OP") {
-          t = TokenType::KwOperator;
-        } else if (lex == "ret") {
-          t = TokenType::KwRet;
-        } else if (lex == "ref") {
-          t = TokenType::KwRef;
-        } else if (lex == "int") {
-          t = TokenType::KwInt;
-        } else if (lex == "float") {
-          t = TokenType::KwFloat;
-        } else if (lex == "string") {
-          t = TokenType::KwString;
+    switch (kind) {
+    case TokenKind::Certain: {
+      switch (c()) {
+      case '#':
+        type = TokenType::Comment;
+        while (index_ < src_.size() && c() != '\n') {
+          consume(len);
         }
-      }
-
-      return Token(t, lex, line_, start_column);
-    }
-
-    case TokenType::LitInt: { // LitString
-      size_t i = index_ + 1;
-      ++column_;
-      TokenType t = type;
-
-      while (i < src_.size() && (std::isdigit(src_[i]) || src_[i] == '.')) {
-        if (src_[i] == '.') {
-          if (t == TokenType::LitInt) {
-            if (i + 1 < src_.size() && std::isdigit(src_[i + 1])) {
-              t = TokenType::LitFloat;
-            } else { // 123.(stop)
-              break;
-            }
-          } else { // 123.456.(stop)
-            break;
-          }
+        break;
+      case '+':
+        type = TokenType::Plus;
+        consume(len);
+        break;
+      case '-':
+        type = TokenType::Minus;
+        consume(len);
+        break;
+      case '*':
+        type = TokenType::Asterisk;
+        consume(len);
+        break;
+      case '/':
+        type = TokenType::Slash;
+        consume(len);
+        break;
+      case '=':
+        type = TokenType::Equal;
+        consume(len);
+        break;
+      case '<':
+        type = TokenType::Less;
+        consume(len);
+        if (index_ < src_.size() && c() == '=') {
+          type = TokenType::LessEqual;
+          consume(len);
         }
-        ++i;
-        ++column_;
+        break;
+      case '&':
+        type = TokenType::And;
+        consume(len);
+        break;
+      case '|':
+        type = TokenType::Or;
+        consume(len);
+        break;
+      case '!':
+        type = TokenType::Not;
+        consume(len);
+        break;
+      case '(':
+        type = TokenType::LeftParen;
+        consume(len);
+        break;
+      case ')':
+        type = TokenType::RightParen;
+        consume(len);
+        break;
+      case '{':
+        type = TokenType::LeftBrace;
+        consume(len);
+        break;
+      case '}':
+        type = TokenType::RightBrace;
+        consume(len);
+        break;
+      case '[':
+        type = TokenType::LeftBracket;
+        consume(len);
+        break;
+      case ']':
+        type = TokenType::RightBracket;
+        consume(len);
+        break;
+      case ':':
+        type = TokenType::Colon;
+        consume(len);
+        break;
+      case ';':
+        type = TokenType::Semicolon;
+        consume(len);
+        break;
+      case '~':
+        type = TokenType::Tilde;
+        consume(len);
+        break;
+      case '>':
+        type = TokenType::Execute;
+        consume(len);
+        break;
+      case '\'':
+        type = TokenType::LitString;
+        consume(len);
+        while (index_ < src_.size() && c() != '\n' && c() != '\'') {
+          consume(len);
+        }
+        if (index_ == src_.size() || c() != '\'') {
+          msg = "[line: " + std::to_string(line_) + " col: " + std::to_string(start_column) + "] " + "String Literal must be ended with single quote(')";
+          type = TokenType::Unknown;
+        } else if (c() == '\'') {
+          consume(len);
+        }
+        break;
       }
-
-      std::string_view lex{src_.data() + index_, i - index_};
-      index_ = i;
-      return Token(t, lex, line_, start_column);
+    } break;
+    case TokenKind::Name: {
+      type = TokenType::Identifier;
+      while (index_ < src_.size() && (std::isalnum(c()) || c() == '_')) {
+        consume(len);
+      }
+      std::string_view word(src_.data() + start_index, len);
+      if (word == "ret") {
+        type = TokenType::KwRet;
+      } else if (word == "ref") {
+        type = TokenType::KwRef;
+      } else if (word == "int") {
+        type = TokenType::KwInt;
+      } else if (word == "float") {
+        type = TokenType::KwFloat;
+      } else if (word == "string") {
+        type = TokenType::KwString;
+      } else if (word == "ZONE") {
+        type = TokenType::KwZone;
+      } else if (word == "LOC") {
+        type = TokenType::KwLocal;
+      } else if (word == "OP") {
+        type = TokenType::KwOperator;
+      }
+      break;
+    }
+    case TokenKind::Number: {
+      type = TokenType::LitInt;
+      size_t cnt_prd = 0;
+      bool wrong_id = false;
+      while (index_ < src_.size() && (std::isalnum(c()) || c() == '_' || c() == '.')) {
+        if (std::isalpha(c()) || c() == '_') {
+          wrong_id = true;
+        } else if (c() == '.') {
+          ++cnt_prd;
+        }
+        consume(len);
+      }
+      if (1 < cnt_prd || wrong_id) {
+        type = TokenType::Unknown;
+        msg = "[line: " + std::to_string(line_) + " col: " + std::to_string(start_column) + "] ";
+        if (wrong_id) {
+          msg += "Wrong Identifier Name. Can not start with numbers.";
+        } else {
+          msg += "Wrong Float Literal format. Check period symbols.";
+        }
+      } else if (1 == cnt_prd) {
+        type = TokenType::LitFloat;
+      }
+      break;
+    }
+    case TokenKind::Unknown: {
+      type = TokenType::Unknown;
+      msg = "[line: " + std::to_string(line_) + " col: " + std::to_string(start_column) + "] " + "Undefined Symbol used.";
+      consume(len);
+      break;
+    }
     }
 
-    case TokenType::LitString: { // Unknown
-      size_t i = index_ + 1;
-      ++column_;
+    std::string_view lex(src_.data() + start_index, len);
 
-      while (i < src_.size() && src_[i] != '\n' && src_[i] != '\'') {
-        ++column_;
-        ++i;
-      }
+    skipTrivia();
 
-      TokenType t = TokenType::LitString;
-      std::string_view lex{src_.data() + index_ + 1, i - index_ - 1};
+    return Token(type, lex, line_, start_column);
+  }
 
-      if (i == src_.size() || src_[i] == '\n') {
-        t = TokenType::Unknown;
-        lex = std::string_view{src_.data() + index_, i - index_};
-      }
+  void consume(size_t &len) {
+    ++index_, ++column_, ++len;
+  }
 
-      if (t == TokenType::LitString) {
-        ++column_;
-        ++i;
-      }
-      index_ = i;
-      return Token(t, lex, line_, start_column);
-    }
+  char c() {
+    return src_[index_];
+  }
 
-    case TokenType::Less: {
-      size_t start_i = index_;
-
-      if (index_ + 1 < src_.size() && src_[index_ + 1] == '=') {
-        column_ += 2;
-        index_ += 2;
-        return Token(TokenType::LessEqual, std::string_view{src_.data() + start_i, 2}, line_, start_column);
+  TokenKind singleKind() {
+    char c = src_[index_];
+    switch (c) {
+    case '#':
+    case '+':
+    case '-':
+    case '*':
+    case '/':
+    case '=':
+    case '<':
+    case '&':
+    case '|':
+    case '!':
+    case '(':
+    case ')':
+    case '{':
+    case '}':
+    case '[':
+    case ']':
+    case ':':
+    case ';':
+    case '~':
+    case '>':
+    case '\'':
+      return TokenKind::Certain;
+    default:
+      if (std::isdigit(c)) {
+        return TokenKind::Number;
+      } else if (std::isalpha(c) || c == '_') {
+        return TokenKind::Name;
       } else {
-        ++column_;
-        ++index_;
-        return Token(type, std::string_view{src_.data() + start_i, 1}, line_, start_column);
+        return TokenKind::Unknown;
       }
-    }
-
-    default: {
-      ++column_;
-      return Token(type, std::string_view{src_.data() + index_++, 1}, line_, start_column);
-    }
     }
   }
 
   void skipTrivia() {
-    while (index_ < src_.size() && isWhiteSpace(index_)) {
-      if (src_[index_] == '\n') {
+    while (index_ < src_.size() && isWhite(c())) {
+      if (c() == '\n') {
         ++line_;
         column_ = 0;
       }
-      ++column_;
-      ++index_;
+      size_t dummy = 0;
+      consume(dummy);
     }
   }
 
-  bool isWhiteSpace(size_t i) {
-    return src_[i] == ' ' || src_[i] == '\t' || src_[i] == '\r' || src_[i] == '\n';
+  bool isWhite(char c) {
+    return c == ' ' || c == '\t' || c == '\r' || c == '\n';
   }
+}; // namespace voyc
 
-  void appendError(std::vector<std::string> &errors, const Token &next) {
-    std::string msg = "Unknown token '" + std::string(next.lexeme) + "' at " + std::to_string(next.line) + ":" + std::to_string(next.column);
-    errors.push_back(std::move(msg));
-  }
-  void appendToken(std::vector<Token> &tokens, const Token &next) {
-    tokens.push_back(next);
-  }
-
-  TokenType tokenTypeFromChar(size_t i) {
-    if (src_.size() == i) {
-      return TokenType::EndOfFile;
-    }
-
-    switch (src_[i]) {
-    case '#':
-      return TokenType::Comment;
-    case '+':
-      return TokenType::Plus;
-    case '-':
-      return TokenType::Minus;
-    case '*':
-      return TokenType::Asterisk;
-    case '/':
-      return TokenType::Slash;
-    case '=':
-      return TokenType::Equal;
-    case '<':
-      return TokenType::Less;
-    case '&':
-      return TokenType::And;
-    case '|':
-      return TokenType::Or;
-    case '!':
-      return TokenType::Not;
-    case ':':
-      return TokenType::Colon;
-    case ';':
-      return TokenType::Semicolon;
-    case '(':
-      return TokenType::LeftParen;
-    case ')':
-      return TokenType::RightParen;
-    case '{':
-      return TokenType::LeftBrace;
-    case '}':
-      return TokenType::RightBrace;
-    case '[':
-      return TokenType::LeftBracket;
-    case ']':
-      return TokenType::RightBracket;
-    case '.':
-      return TokenType::Period;
-    case '>':
-      return TokenType::Execute;
-    case '_':
-      return TokenType::Identifier;
-    case '\'':
-      return TokenType::LitString;
-    default:
-      if (std::isdigit(src_[i])) {
-        return TokenType::LitInt;
-      } else if (std::isalpha(src_[i]) || src_[i] == '_') {
-        return TokenType::Identifier;
-      } else {
-        return TokenType::Unknown;
-      }
-    }
-  }
-};
 } // namespace
 
 LexResult lexSource(const std::string_view src) {
   // 역할: string_view로 된 소스코드를 읽어서 토큰으로 분해하는 역할
   return voyc::Lexer(src).run();
 }
+
 } // namespace voyc
