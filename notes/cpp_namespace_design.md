@@ -1,37 +1,66 @@
-# cpp namespace design
+# Namespace 설계
 
-이 노트는 `namespace voyc` 사용 이유와 C++에서 네임스페이스가 어떤 역할을 하는지 정리합니다.
+voyc에서 `namespace voyc`와 익명 namespace를 사용하는 방식을 정리합니다.
 
-## 1. 왜 `namespace`로 감싸는가
+## `namespace voyc`
 
-### 1.1. 전역 이름 충돌 방지
-C++에서 전역 영역에 타입이나 함수 이름을 그대로 두면, 다른 라이브러리나 다른 코드와 이름이 겹칠 수 있습니다.
-`namespace voyc { ... }`를 사용하면 `voyc::LexResult`, `voyc::lexSource`처럼 고유한 이름을 만들 수 있습니다.
+프로젝트의 공용 API를 `voyc::` 접두사로 노출합니다:
 
-### 1.2. 모듈 경계를 명확히 하기
-네임스페이스는 코드의 논리적 묶음입니다. 같은 프로젝트 안에서도 lexer, parser, runtime 같은 서로 다른 영역을 분리할 수 있습니다.
-`voyc` 네임스페이스는 이 프로젝트 전체의 공용 API를 나타냅니다.
+```cpp
+// include/voyc/lexer.hpp
+namespace voyc {
+    LexResult lexSource(std::string_view src);
+}
 
-### 1.3. 디자인 패턴 관점
-네임스페이스는 GoF 디자인패턴처럼 특정한 알고리즘이나 구조를 강제하는 패턴은 아닙니다.
-대신 "모듈화된 네임스페이스"는 소프트웨어 설계에서 흔히 사용하는 "캡슐화"와 "이름 공간 관리"의 원칙에 해당합니다.
-C++에서는 네임스페이스를 통해 코드 조각을 명확히 구분하고, 외부 인터페이스를 안전하게 노출할 수 있습니다.
+// main.cpp
+const voyc::LexResult result = voyc::lexSource(src);
+```
 
-## 2. `lexer.hpp`에 적용된 설계
+이름 충돌을 방지하고, 외부 코드에서 출처가 명확한 호출을 가능하게 합니다.
 
-### 2.1. `#pragma once`
-헤더 파일이 여러 번 포함되는 것을 방지하기 위해 `#pragma once`를 사용합니다.
-이는 컴파일러가 해당 헤더를 한 번만 처리하도록 합니다.
+## 익명 namespace
 
-### 2.2. 필요한 헤더만 포함
-`lexer.hpp`에서는 `std::string`, `std::string_view`, `std::vector`를 사용하므로 관련 표준 헤더만 포함합니다.
-또한 `voyc/token.hpp`를 포함해서 `Token` 타입을 사용할 수 있게 합니다.
+`.cpp` 파일 내부에서만 쓰이는 구현 세부사항을 숨깁니다:
 
-### 2.3. 네임스페이스와 타입 정의
-`namespace voyc { ... }` 안에 `LexResult`와 `lexSource`를 선언하여, 프로젝트 API가 `voyc::LexResult`, `voyc::lexSource`로 노출됩니다.
-이렇게 하면 전역 네임스페이스 오염을 막고, 외부 코드에서 명확하게 호출할 수 있습니다.
+```cpp
+// lexer.cpp
+namespace voyc {
+namespace {
 
-## 3. 정리
+class Lexer { /* ... */ };
 
-* `namespace`는 이름 충돌을 피하고 모듈 경계를 명확히 하기 위한 C++ 표준 방식입니다.
-* `namespace voyc`를 쓰면 이 프로젝트의 API가 `voyc::...` 형태로 깔끔하게 노출됩니다.
+} // namespace
+
+LexResult lexSource(std::string_view src) {
+    return Lexer(src).run();  // 외부에는 Lexer가 보이지 않음
+}
+
+} // namespace voyc
+```
+
+익명 namespace에 넣은 `Lexer` 클래스는 `lexer.cpp` 외부에서 접근할 수 없습니다. 링크 단위 내부 전용(symbol visibility 제어)입니다.
+
+## `using namespace` 사용처
+
+`.cpp` 파일 내부에서만 제한적으로 사용합니다:
+
+```cpp
+// ✅ 구현 파일 내부
+using namespace std::placeholders;
+
+// ❌ 헤더 파일이나 전역 영역
+using namespace voyc;  // 이름 충돌 위험
+```
+
+## voyc 실제 구조
+
+| 위치 | namespace | 공개 여부 |
+|------|-----------|-----------|
+| `include/voyc/*.hpp` | `namespace voyc` | ✅ 외부 공개 |
+| `src/*.cpp` (구현) | `namespace voyc { namespace { ... } }` | ❌ 내부 전용 |
+
+## 요약
+
+- `namespace voyc`는 공용 API를 외부에 노출합니다.
+- 익명 namespace는 구현 세부사항을 `.cpp` 내부로 숨깁니다.
+- `using namespace`는 헤더나 전역에서 사용하지 않습니다.
