@@ -1,6 +1,6 @@
 # fstream — 파일 입출력
 
-voyc에서 파일을 읽어 `std::string`으로 만드는 방법을 정리합니다.
+C++ 파일 스트림을 사용하여 파일을 읽고 쓰는 방법을 정리합니다.
 
 ## 스트림 타입
 
@@ -12,19 +12,21 @@ voyc에서 파일을 읽어 `std::string`으로 만드는 방법을 정리합니
 
 ## RAII
 
-`std::ifstream`은 소멸자에서 파일을 자동으로 닫습니다. 명시적 `close()`는 필요 없습니다:
+`std::ifstream`은 소멸자에서 파일을 자동으로 닫습니다:
 
 ```cpp
 {
-    std::ifstream file("input.voy");
+    std::ifstream file("input.txt");
     // 파일 읽기...
 } // ← 소멸자가 자동으로 close()
 ```
 
+명시적 `close()`는 거의 필요 없습니다.
+
 ## 파일 열기 상태 확인
 
 ```cpp
-std::ifstream file(path);
+std::ifstream file("input.txt");
 if (!file.is_open()) {
     // 열기 실패 처리
 }
@@ -34,41 +36,32 @@ if (!file) { /* 동일 */ }
 
 ## 전체 파일 읽기
 
-voyc의 방식 (`istreambuf_iterator`):
+`istreambuf_iterator` 방식:
 
 ```cpp
-std::string src(
+std::string content(
     std::istreambuf_iterator<char>(file),
     std::istreambuf_iterator<char>()
 );
 ```
 
-대안 (`ostringstream` + `rdbuf()`):
+`ostringstream` + `rdbuf()` 방식:
 
 ```cpp
 std::ostringstream buffer;
 buffer << file.rdbuf();
-std::string src = buffer.str();
+std::string content = buffer.str();
 ```
 
-두 방식 모두 전체 파일을 메모리에 로드합니다. 큰 파일에는 메모리 사용량을 고려해야 합니다.
+두 방식 모두 전체 파일을 메모리에 로드합니다.
 
-## voyc 실제 코드
+## 줄 단위 읽기
 
 ```cpp
-// main.cpp
-std::ifstream file(argv[1]);
-if (!file.is_open()) {
-    std::cerr << "Error: Could not open file " << argv[1] << std::endl;
-    return 1;
+std::string line;
+while (std::getline(file, line)) {
+    // line 처리
 }
-
-std::string src(
-    std::istreambuf_iterator<char>(file),
-    std::istreambuf_iterator<char>()
-);
-
-const voyc::LexResult result = voyc::lexSource(src);
 ```
 
 ## 모드 플래그
@@ -88,5 +81,5 @@ std::ifstream bin("data.bin", std::ios::binary);
 
 - `std::ifstream`은 RAII로 파일을 자동 관리합니다.
 - 파일 열기 실패는 `is_open()`으로 체크합니다.
-- voyc는 `istreambuf_iterator`로 전체 파일을 `std::string`에 읽습니다.
-- 쓰기 시 `std::ios::app`으로 기존 내용을 보존할 수 있습니다.
+- 전체 파일 읽기는 `istreambuf_iterator` 또는 `ostringstream + rdbuf()`를 사용합니다.
+- 줄 단위 처리는 `std::getline`을 사용합니다.

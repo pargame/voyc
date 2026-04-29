@@ -1,66 +1,72 @@
 # Namespace 설계
 
-voyc에서 `namespace voyc`와 익명 namespace를 사용하는 방식을 정리합니다.
+C++에서 네임스페이스를 설계하고 사용하는 방법을 정리합니다.
 
-## `namespace voyc`
-
-프로젝트의 공용 API를 `voyc::` 접두사로 노출합니다:
+## 기본 역할
 
 ```cpp
-// include/voyc/lexer.hpp
-namespace voyc {
-    LexResult lexSource(std::string_view src);
+namespace mylib {
+    struct Result { /* ... */ };
+    Result process(const std::string& input);
 }
 
-// main.cpp
-const voyc::LexResult result = voyc::lexSource(src);
+// 사용
+mylib::Result r = mylib::process("hello");
 ```
 
-이름 충돌을 방지하고, 외부 코드에서 출처가 명확한 호출을 가능하게 합니다.
+네임스페이스는 이름 충돌을 방지하고, 코드의 논리적 묶음을 명확히 합니다.
 
 ## 익명 namespace
 
 `.cpp` 파일 내부에서만 쓰이는 구현 세부사항을 숨깁니다:
 
 ```cpp
-// lexer.cpp
-namespace voyc {
+// parser.cpp
 namespace {
 
-class Lexer { /* ... */ };
+class ParserImpl { /* ... */ };
 
 } // namespace
 
-LexResult lexSource(std::string_view src) {
-    return Lexer(src).run();  // 외부에는 Lexer가 보이지 않음
+Result parse(const std::string& input) {
+    return ParserImpl(input).run();  // 외부에는 ParserImpl이 보이지 않음
 }
-
-} // namespace voyc
 ```
 
-익명 namespace에 넣은 `Lexer` 클래스는 `lexer.cpp` 외부에서 접근할 수 없습니다. 링크 단위 내부 전용(symbol visibility 제어)입니다.
+익명 namespace에 넣은 심볼은 해당 소스 파일 외부에서 접근할 수 없습니다.
 
 ## `using namespace` 사용처
 
-`.cpp` 파일 내부에서만 제한적으로 사용합니다:
-
 ```cpp
-// ✅ 구현 파일 내부
-using namespace std::placeholders;
+// ✅ 구현 파일 내부, 제한된 범위
+void helper() {
+    using namespace std::literals;
+    auto s = "hello"s;
+}
 
 // ❌ 헤더 파일이나 전역 영역
-using namespace voyc;  // 이름 충돌 위험
+using namespace mylib;  // 이름 충돌 위험
 ```
 
-## voyc 실제 구조
+## 중첩 namespace
+
+```cpp
+namespace mylib::lexer {
+    struct Token { /* ... */ };
+}
+
+// C++17 이상
+```
+
+## 구조
 
 | 위치 | namespace | 공개 여부 |
 |------|-----------|-----------|
-| `include/voyc/*.hpp` | `namespace voyc` | ✅ 외부 공개 |
-| `src/*.cpp` (구현) | `namespace voyc { namespace { ... } }` | ❌ 내부 전용 |
+| 헤더 파일 | `namespace mylib` | ✅ 외부 공개 |
+| 소스 파일 | `namespace { /* 구현 */ }` | ❌ 내부 전용 |
 
 ## 요약
 
-- `namespace voyc`는 공용 API를 외부에 노출합니다.
-- 익명 namespace는 구현 세부사항을 `.cpp` 내부로 숨깁니다.
+- 네임스페이스는 이름 충돌을 방지하고 API 경계를 명확히 합니다.
+- 익명 namespace는 구현 세부사항을 `.cpp` 낸부로 숨깁니다.
 - `using namespace`는 헤더나 전역에서 사용하지 않습니다.
