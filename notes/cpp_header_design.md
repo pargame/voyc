@@ -52,6 +52,14 @@ namespace mylib {
 
 디렉터리 경로와 코드의 네임스페이스가 일치하면 코드의 구조를 예측하기 쉬워집니다.
 
+## 큰따옴표 vs 꺾쇠
+
+| 구분 | `""` | `<>` |
+|------|------|------|
+| 검색 순서 | 현재 파일 경로 → include path | include path만 |
+| 용도 | 프로젝트 낸부 헤더 | 시스템/외부 라이브러리 헤더 |
+| 예시 | `#include "mylib/lexer.hpp"` | `#include <iostream>` |
+
 ## include 경로 설정
 
 CMake에서 설정하는 방법:
