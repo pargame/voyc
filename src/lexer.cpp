@@ -26,7 +26,13 @@ private:
   size_t index_;
 
 public:
-  Lexer(std::string_view src) : src_(src), line_(1), column_(1), index_(0) {
+  explicit Lexer(std::string_view src) : src_(src), line_(1), column_(1), index_(0) {
+    if (src_.size() >= 3 &&
+        static_cast<unsigned char>(src_[0]) == 0xEF &&
+        static_cast<unsigned char>(src_[1]) == 0xBB &&
+        static_cast<unsigned char>(src_[2]) == 0xBF) {
+      index_ = 3;
+    }
   }
 
   LexResult run() {
